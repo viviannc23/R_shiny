@@ -18,4 +18,4 @@ AirTraffic$ISO <- as.factor(AirTraffic$ISO)
 AirAU <- AirTraffic %>% filter(., Country == "Australia")
   
 gAU <- ggplot(data = AirAU, aes(Date, PercentOfBaseline))+geom_line()
-gAU
+gAU #Australia air traffic chart
