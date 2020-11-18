@@ -1,19 +1,20 @@
 library(shiny)
 library(tidyverse)
 
-# import data ####
-setwd("~/NYDSA/Projects/ShinyApp")
-flights <- read.csv("US.Airport_flights.csv", stringsAsFactors = TRUE)
-flights <- flights %>% select(-X) %>% mutate(date=as.Date(date)) %>%
-    mutate(month=as.numeric(format(date,"%m")))
-
-cases <- read.csv("cleaned_cases.csv", stringsAsFactors = TRUE)
-cases <- cases %>% mutate(date=as.Date(date), cases=as.numeric(cases)) %>%
-    filter(date<"2020-11-1" & region != "Noncontiguous") %>% select(-X)
+#import data ####
+# setwd("~/NYDSA/Projects/ShinyApp")
+# flights <- read.csv("US.Airport_flights.csv", stringsAsFactors = TRUE)
+# flights <- flights %>% select(-X) %>% mutate(date=as.Date(date)) %>%
+#     mutate(month=as.numeric(format(date,"%m")))
+# 
+# cases <- read.csv("cleaned_cases.csv", stringsAsFactors = TRUE)
+# cases <- cases %>% mutate(date=as.Date(date), cases=as.numeric(cases)) %>%
+#     filter(date<"2020-11-1" & region != "Noncontiguous") %>% select(-X)
 
 # UI ####
 ui <- fluidPage(
     theme = "bootstrap.min.css",
+    
     titlePanel(h1("US domestic flights 2020 vs COVID cases")), br(),
 
         sidebarLayout(
@@ -28,7 +29,7 @@ ui <- fluidPage(
             explore the international trends, also including how travel restrictions affects 
             international air traffic.",
             br(),br(),
-            h3("Data sources"),
+            h3("Data sources & Limitations"),
             tags$a(href="https://zenodo.org/record/4266938#.X66h8C-cZQI", "Flights dataset"),
             " is crowdsourced air traffic data from The OpenSky Network 2020.\n",
             br(),
@@ -41,7 +42,7 @@ ui <- fluidPage(
         mainPanel(
             tabsetPanel(
 
-                tabPanel("Overall", 
+                tabPanel(h3("Overall"), 
                          
                          fluidRow(br(),                           
                              column(6,(
@@ -58,7 +59,7 @@ ui <- fluidPage(
                          
                          ), 
                 
-                tabPanel("By Region", 
+                tabPanel(h3("By Region"), 
                          
                          # fluidRow(radioButtons("origDest", 
                          #              label = h4("Flight Region by:"),
@@ -71,18 +72,31 @@ ui <- fluidPage(
                          
                          ),
                 
-                tabPanel("By State", 
+                tabPanel(h3("By State"), 
                          
-                         selectizeInput(inputId = "state",
-                                        label = h4("Select State"),
-                                        choices = sort(unique(cases$state))),
+                         fluidRow(
+                             radioButtons(
+                                 "direction",
+                                 label = h4("Flight direction"),
+                                 choices = list("Outbound/ originating from" = "origin.state",
+                                                "Inbound/ arriving into" = "dest.state"),
+                                 selected = "origin.state"
+                             ),
+                             
+                             selectizeInput(
+                                 inputId = "state",
+                                 label = h4("Select State"),
+                                 choices = sort(unique(cases$state)),
+                                 selected = "New York"
+                             ),
+
+                         ), 
                          
                          plotOutput("flightsByState"),
                          plotOutput("casesByState")
                         ),
                 
-                tabPanel("By Airport", 
-                         
+                tabPanel(h3("By Airport"), 
                          
                          fluidRow(radioButtons("Origin.airportSize",
                                                label = "Origin Airport Size:",
@@ -90,12 +104,12 @@ ui <- fluidPage(
                                                               "Medium" = "medium_airport",
                                                               "Small" = "small_airport"),
                                                selected = "large_airport"),
+                                  
                                   selectizeInput(inputId = "origin",
                                                  label = h4("Select Origin"),
                                                  choices = unique(flights$origin))
                                   ),
-                         
-                         
+                        
                          fluidRow(radioButtons("Dest.airportSize",
                                                label = "Destination Airport Size:",
                                                choices = list("Large" = "large_airport",
@@ -120,7 +134,7 @@ ui <- fluidPage(
 )
 
 # SERVER ####
-server <- function(input, output, session) {
+server <- function(input, output) {
 
     output$allFlights <- renderPlot({
         flights %>% filter(date >= input$dates[1] & date <= input$dates[2]) %>% 
@@ -156,7 +170,8 @@ server <- function(input, output, session) {
     
     output$flightsByState <- renderPlot({
         flights %>% mutate(month = as.factor(month))
-        flights %>% filter(origin.state == input$state) %>% 
+        flights %>% rename(.,city=input$direction)%>%
+            filter(city == input$state) %>% 
             group_by(date,month) %>% summarise(n=n()) %>% 
             ggplot(.,aes(x = month, y = n, group = month))+geom_boxplot()+
             coord_cartesian(xlim = c(1,10)) +
@@ -166,11 +181,15 @@ server <- function(input, output, session) {
     })
     
     output$casesByState <- renderPlot({
-        cases %>% group_by(date) %>% 
-            summarise(total=sum(cases)) %>%
-            ggplot(., aes(date, total))+geom_area(fill="grey")
-        cases %>% filter(state==input$state) %>% 
-            ggplot(.,aes(x=date,y=cases)) + geom_line(stat="identity")
+        # cases %>% group_by(date) %>% 
+        #     summarise(total=sum(cases)) %>%
+        #     ggplot(., aes(date, total))+geom_area(fill="grey")
+        # cases %>% filter(state==input$state) %>% 
+        #     ggplot(.,aes(x=date,y=cases)) + geom_line(stat="identity")
+        cases %>% filter(state==input$state) %>% arrange(date) %>%
+            ggplot(.,aes(x=date)) +
+            #geom_area(aes(y=cases),fill="grey") +
+            geom_bar(stat="identity",aes(y=new_cases,fill=new_cases))
     })
     
     output$flightsByAirport <- renderPlot({
@@ -198,3 +217,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+

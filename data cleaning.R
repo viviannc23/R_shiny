@@ -1,7 +1,7 @@
 setwd("~/NYDSA/Projects/Shiny")
 library(tidyverse)
 
-# import airport & cases ####
+# import & clean airports ####
 airport <- read.csv("airport_codes.csv",stringsAsFactors = TRUE)
 airport$initial <- substring(airport$ident, first = 1, last = 1)
 airport <- airport %>% filter(initial == "K" & 
@@ -18,15 +18,36 @@ airport <- airport %>% left_join(., UStates, by="iso_region")
 
 #write.csv(airport,"cleaned_airport.csv")
 
+# import & clean cases ####
+
 UStates <- UStates %>% rename(state=state.name)
 
 cases <- read.csv("cases_by_state.csv",stringsAsFactors = TRUE)
 cases <- cases %>% select(-fips) %>% right_join(.,UStates,by="state") %>%
   select(-iso_region) %>% rename(region=state.region)
 cases$date <- as.Date(cases$date)
-#write.csv(cases,"cleaned_cases.csv")
 
-# combine master & airport ####
+stateList = unique(cases$state)
+cases$new_cases = "hello"
+final <- cases[1,]
+
+for (item in stateList){
+  temp <- cases %>% filter(state==item)
+  temp$new_cases[1] = temp$cases[1]
+  
+    for (i in 2:length(temp$date)){
+      
+      if ((temp$cases[i]-temp$cases[i-1])<0){
+        temp$new_cases[i]=0
+      }else {temp$new_cases[i] = temp$cases[i]-temp$cases[i-1]}}
+      
+  final <- rbind(temp,final)
+}
+final <- final %>% filter(new_cases != "hello") %>% unique()
+write.csv(final,"cleaned_cases.csv")
+rm(temp)
+
+# combine master flights & airport ####
 setwd('./datasets')
 master_flights=read.csv("US_master_flights.csv",stringsAsFactors = TRUE)
 
@@ -39,8 +60,8 @@ US_flights <- master_flights %>% select(-X,date,origin,destination) %>%
          origin.state=state.name, 
          origin.municipality=municipality,
          origin.region = state.region) %>% select(-iso_region)
-
 US_flights$origin <- substring(US_flights$origin,first=2,last=4)
+
 US_flights <- US_flights %>% rename(airport_code = destination) %>%
   inner_join(.,airport,by="airport_code") %>%
   rename(dest = airport_code, 
@@ -68,3 +89,9 @@ flights %>% group_by(month, origin.region) %>%
   summarise(n=n()) %>% 
   ggplot(.,aes(x=month, y=n)) + geom_bar(stat="identity",aes(fill=origin.region))
 
+cases %>% filter(state=="Texas") %>% arrange(date) %>%
+  ggplot(.,aes(x=date))+
+  geom_area(aes(y=cases),fill="grey")+
+  geom_bar(stat="identity",aes(y=new_cases,fill=new_cases))
+  scale_y_continuous(name="cumulative cases",
+                     sec.axis=sec_axis(~./10000, name="new cases"))
