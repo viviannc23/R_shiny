@@ -80,7 +80,7 @@ write.csv(US_flights,"US.Airport_flights.csv")
 timeSeries <- flights %>% arrange(date) %>% group_by(date) %>% count() 
 timeSeries$date <- as.Date(timeSeries$date)
 ggplot(data=timeSeries, aes(x=date, y=n))+geom_line()+
-  labs(title="daily flights", x="date", y="# of flight")
+  labs(title="daily flights", x="date", y="# of flight")+theme_bw()
 
 caseTrend <- cases %>% group_by(date,region) %>% summarise(total=sum(cases))
 ggplot(data=caseTrend, aes(x=date, y=total))+geom_line(aes(color=region))
@@ -95,3 +95,23 @@ cases %>% filter(state=="Texas") %>% arrange(date) %>%
   geom_bar(stat="identity",aes(y=new_cases,fill=new_cases))
   scale_y_continuous(name="cumulative cases",
                      sec.axis=sec_axis(~./10000, name="new cases"))
+
+cases %>% filter(state=="Texas") %>% arrange(date) %>%
+  ggplot(.,aes(x=date)) +
+  geom_area(aes(y=cases),fill="grey") +
+  geom_bar(aes(y=new_cases,fill=new_cases),stat="identity")
+    
+cases %>% group_by(date) %>% summarise(n=sum(new_cases),
+                                       total=sum(cases)) %>% 
+  ggplot(.,aes(x=date))+
+  geom_bar(aes(y=n*50,fill=n),stat="identity") +
+  geom_line(aes(y=total), size=0.5, color="red") +
+  scale_y_continuous(name="cumulative cases")
+
+list=unique(flights_large$origin.region)
+
+
+# selectInput("stateList", "Choose an airport:",
+#             list(`East Coast` = list("NY", "NJ", "CT"),
+#                  `West Coast` = list("WA", "OR", "CA"),
+#                  `Midwest` = list("MN", "WI", "IA"))),    
